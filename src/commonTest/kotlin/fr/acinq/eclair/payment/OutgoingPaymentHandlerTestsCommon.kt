@@ -181,7 +181,7 @@ class OutgoingPaymentHandlerTestsCommon : EclairTestSuite() {
             val result2 = outgoingPaymentHandler.processAddFailed(alice.channelId, addFailure, mapOf(alice.channelId to alice))
             val expected = OutgoingPaymentHandler.Failure(
                 payment,
-                OutgoingPaymentFailure(FinalFailure.NoAvailableChannels, listOf(Either.Left(HtlcValueTooHighInFlight(alice.channelId, maxHtlcValueInFlightMsat.toULong(), 200_000.msat))))
+                OutgoingPaymentFailure(FinalFailure.NoAvailableChannels, listOf(Either.Left(HtlcValueTooHighInFlight(alice.channelId, maxHtlcValueInFlightMsat, 200_000.msat))))
             )
             assertEquals(result2, expected)
 
@@ -533,7 +533,7 @@ class OutgoingPaymentHandlerTestsCommon : EclairTestSuite() {
         val localFailures = listOf(
             { channelId: ByteVector32 -> TooManyAcceptedHtlcs(channelId, 15) },
             { channelId: ByteVector32 -> InsufficientFunds(channelId, 5_000.msat, 1.sat, 20.sat, 1.sat) },
-            { channelId: ByteVector32 -> HtlcValueTooHighInFlight(channelId, 150_000U, 155_000.msat) },
+            { channelId: ByteVector32 -> HtlcValueTooHighInFlight(channelId, 150_000L, 155_000.msat) },
         )
         localFailures.forEach { localFailure ->
             val (channelId, add) = filterAddHtlcCommands(progress).first()

@@ -154,6 +154,7 @@ data class IncomingPayment(
         /** Payment was received via existing lightning channels. */
         @Serializable
         object LightningPayment : ReceivedWith() {
+            @Transient
             override val fees: MilliSatoshi = 0.msat
         }
 
@@ -198,6 +199,7 @@ data class OutgoingPayment(
     @Transient
     val paymentHash: ByteVector32 = details.paymentHash
 
+    @Transient
     val fees: MilliSatoshi = when (status) {
         is Status.Failed -> 0.msat
         else -> parts.filter { it.status is Part.Status.Succeeded || it.status == Part.Status.Pending }.map { it.amount }.sum() - recipientAmount

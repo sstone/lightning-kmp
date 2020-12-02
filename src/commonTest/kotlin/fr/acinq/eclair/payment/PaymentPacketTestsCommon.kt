@@ -511,7 +511,7 @@ class PaymentPacketTestsCommon : EclairTestSuite() {
         )
         val failure = IncomingPacket.decrypt(UpdateAddHtlc(randomBytes32(), 4, amountE, paymentHash, expiryE, onionE.packet), privE)
         @Suppress("EXPERIMENTAL_UNSIGNED_LITERALS")
-        assertEquals(Either.Left(InvalidOnionPayload(8U, 0)), failure)
+        assertEquals(Either.Left(InvalidOnionPayload(8, 0)), failure)
     }
 }
 

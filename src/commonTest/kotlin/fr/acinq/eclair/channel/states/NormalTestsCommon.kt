@@ -232,7 +232,7 @@ class NormalTestsCommon : EclairTestSuite() {
         val (_, bob0) = reachNormal()
         val (_, actions) = bob0.process(ChannelEvent.ExecuteCommand(defaultAdd.copy(amount = 151_000_000.msat)))
         val actualError = actions.findCommandError<HtlcValueTooHighInFlight>()
-        val expectedError = HtlcValueTooHighInFlight(bob0.channelId, maximum = 150_000_000UL, actual = 151_000_000.msat)
+        val expectedError = HtlcValueTooHighInFlight(bob0.channelId, maximum = 150_000_000L, actual = 151_000_000.msat)
         assertEquals(expectedError, actualError)
     }
 
@@ -243,7 +243,7 @@ class NormalTestsCommon : EclairTestSuite() {
         actionsBob1.hasOutgoingMessage<UpdateAddHtlc>()
         val (_, actionsBob2) = bob1.process(ChannelEvent.ExecuteCommand(defaultAdd.copy(amount = 75_500_000.msat)))
         val actualError = actionsBob2.findCommandError<HtlcValueTooHighInFlight>()
-        val expectedError = HtlcValueTooHighInFlight(bob0.channelId, maximum = 150_000_000UL, actual = 151_000_000.msat)
+        val expectedError = HtlcValueTooHighInFlight(bob0.channelId, maximum = 150_000_000L, actual = 151_000_000.msat)
         assertEquals(expectedError, actualError)
     }
 
