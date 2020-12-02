@@ -49,7 +49,7 @@ object IncomingPacket {
                     try {
                         Either.Right(FinalPayload.read(decrypted.value.payload.toByteArray()))
                     } catch (_: Throwable) {
-                        Either.Left(InvalidOnionPayload(0U, 0))
+                        Either.Left(InvalidOnionPayload(0, 0))
                     }
                 }
             }
@@ -74,7 +74,7 @@ object IncomingPacket {
             // previous trampoline didn't forward the right amount
             outerPayload.totalAmount != innerPayload.amount -> Either.Left(FinalIncorrectHtlcAmount(outerPayload.totalAmount))
             // trampoline recipients always provide a payment secret in the invoice
-            innerPayload.paymentSecret == null -> Either.Left(InvalidOnionPayload(8U, 0))
+            innerPayload.paymentSecret == null -> Either.Left(InvalidOnionPayload(8, 0))
             else -> {
                 // We merge contents from the outer and inner payloads.
                 // We must use the inner payload's total amount and payment secret because the payment may be split between multiple trampoline payments (#reckless).

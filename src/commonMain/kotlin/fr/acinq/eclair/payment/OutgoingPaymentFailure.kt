@@ -3,8 +3,10 @@ package fr.acinq.eclair.payment
 import fr.acinq.eclair.channel.ChannelException
 import fr.acinq.eclair.utils.Either
 import fr.acinq.eclair.wire.*
+import kotlinx.serialization.Serializable
 
 /** A fatal failure that stops payment attempts. */
+@Serializable
 sealed class FinalFailure {
     abstract val message: String
 
@@ -12,14 +14,14 @@ sealed class FinalFailure {
     fun toPaymentFailure(): OutgoingPaymentFailure = OutgoingPaymentFailure(this, listOf())
 
     // @formatter:off
-    object InvalidPaymentAmount : FinalFailure() { override val message: String = "Invalid parameter: payment amount must be positive." }
-    object InvalidPaymentId : FinalFailure() { override val message: String = "Invalid parameter: payment ID must be unique." }
-    object NoAvailableChannels : FinalFailure() { override val message: String = "No channels available to send payment. Check internet connection or ensure you have an available balance." }
-    object InsufficientBalance : FinalFailure() { override val message: String = "Not enough funds in wallet to afford payment (note that fees may apply)." }
-    object NoRouteToRecipient : FinalFailure() { override val message: String = "Unable to route payment to recipient." }
-    object RetryExhausted: FinalFailure() { override val message: String = "Payment attempts exhausted without success." }
-    object WalletRestarted: FinalFailure() { override val message: String = "Wallet restarted while a payment was ongoing." }
-    object UnknownError : FinalFailure() { override val message: String = "An unknown error occurred." }
+    @Serializable object InvalidPaymentAmount : FinalFailure() { override val message: String = "Invalid parameter: payment amount must be positive." }
+    @Serializable object InvalidPaymentId : FinalFailure() { override val message: String = "Invalid parameter: payment ID must be unique." }
+    @Serializable object NoAvailableChannels : FinalFailure() { override val message: String = "No channels available to send payment. Check internet connection or ensure you have an available balance." }
+    @Serializable object InsufficientBalance : FinalFailure() { override val message: String = "Not enough funds in wallet to afford payment (note that fees may apply)." }
+    @Serializable object NoRouteToRecipient : FinalFailure() { override val message: String = "Unable to route payment to recipient." }
+    @Serializable object RetryExhausted: FinalFailure() { override val message: String = "Payment attempts exhausted without success." }
+    @Serializable object WalletRestarted: FinalFailure() { override val message: String = "Wallet restarted while a payment was ongoing." }
+    @Serializable object UnknownError : FinalFailure() { override val message: String = "An unknown error occurred." }
     // @formatter:on
 }
 

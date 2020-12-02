@@ -6,10 +6,14 @@ import fr.acinq.bitcoin.PublicKey
 import fr.acinq.eclair.MilliSatoshi
 import fr.acinq.eclair.ShortChannelId
 import fr.acinq.eclair.channel.ChannelException
+import fr.acinq.eclair.io.ByteVector32KSerializer
+import fr.acinq.eclair.io.PublicKeyKSerializer
 import fr.acinq.eclair.payment.FinalFailure
 import fr.acinq.eclair.payment.PaymentRequest
 import fr.acinq.eclair.utils.*
 import fr.acinq.eclair.wire.FailureMessage
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 interface PaymentsDb : IncomingPaymentsDb, OutgoingPaymentsDb {
     /** List sent and received payments (with most recent payments first). */
@@ -68,6 +72,7 @@ interface OutgoingPaymentsDb {
 enum class PaymentTypeFilter { Normal, KeySend, SwapIn, SwapOut }
 
 /** A payment made to or from the wallet. */
+@Serializable
 sealed class WalletPayment {
     companion object {
         /** Absolute time in milliseconds since UNIX epoch when the payment was completed. */
@@ -112,20 +117,28 @@ sealed class WalletPayment {
  * @param status current status of the payment.
  * @param createdAt absolute time in milliseconds since UNIX epoch when the payment request was generated.
  */
-data class IncomingPayment(val preimage: ByteVector32, val origin: Origin, val status: Status, val createdAt: Long = currentTimestampMillis()) : WalletPayment() {
+@Serializable
+data class IncomingPayment(
+    @Serializable(with = ByteVector32KSerializer::class) val preimage: ByteVector32,
+    val origin: Origin,
+    val status: Status,
+    val createdAt: Long = currentTimestampMillis()
+) : WalletPayment() {
     constructor(preimage: ByteVector32, origin: Origin) : this(preimage, origin, Status.Pending, currentTimestampMillis())
 
+    @Transient
     val paymentHash: ByteVector32 = Crypto.sha256(preimage).toByteVector32()
 
+    @Serializable
     sealed class Origin {
         /** A normal, invoice-based lightning payment. */
-        data class Invoice(val paymentRequest: PaymentRequest) : Origin()
+        @Serializable data class Invoice(val paymentRequest: PaymentRequest) : Origin()
 
         /** KeySend payments are spontaneous donations for which we didn't create an invoice. */
-        object KeySend : Origin()
+        @Serializable object KeySend : Origin()
 
         /** Swap-in works by sending an on-chain transaction to a swap server, which will pay us in exchange. */
-        data class SwapIn(val amount: MilliSatoshi, val address: String, val paymentRequest: PaymentRequest?) : Origin()
+        @Serializable data class SwapIn(val amount: MilliSatoshi, val address: String, val paymentRequest: PaymentRequest?) : Origin()
 
         fun matchesFilters(filters: Set<PaymentTypeFilter>): Boolean = when (this) {
             is Invoice -> filters.isEmpty() || filters.contains(PaymentTypeFilter.Normal)
@@ -134,22 +147,29 @@ data class IncomingPayment(val preimage: ByteVector32, val origin: Origin, val s
         }
     }
 
+    @Serializable
     sealed class ReceivedWith {
         abstract val fees: MilliSatoshi
 
         /** Payment was received via existing lightning channels. */
+        @Serializable
         object LightningPayment : ReceivedWith() {
             override val fees: MilliSatoshi = 0.msat
         }
 
         /** Payment was received via a new channel opened to us. */
-        data class NewChannel(override val fees: MilliSatoshi, val channelId: ByteVector32?) : ReceivedWith()
+        @Serializable
+        data class NewChannel(
+            override val fees: MilliSatoshi,
+            @Serializable(with = ByteVector32KSerializer::class) val channelId: ByteVector32?
+        ) : ReceivedWith()
     }
 
+    @Serializable
     sealed class Status {
-        object Pending : Status()
-        object Expired : Status()
-        data class Received(val amount: MilliSatoshi, val receivedWith: ReceivedWith, val receivedAt: Long = currentTimestampMillis()) : Status()
+        @Serializable object Pending : Status()
+        @Serializable object Expired : Status()
+        @Serializable data class Received(val amount: MilliSatoshi, val receivedWith: ReceivedWith, val receivedAt: Long = currentTimestampMillis()) : Status()
     }
 }
 
@@ -164,30 +184,46 @@ data class IncomingPayment(val preimage: ByteVector32, val origin: Origin, val s
  * @param parts partial child payments that have actually been sent.
  * @param status current status of the payment.
  */
-data class OutgoingPayment(val id: UUID, val recipientAmount: MilliSatoshi, val recipient: PublicKey, val details: Details, val parts: List<Part>, val status: Status) : WalletPayment() {
+@Serializable
+data class OutgoingPayment(
+    val id: UUID,
+    val recipientAmount: MilliSatoshi,
+    @Serializable(with = PublicKeyKSerializer::class) val recipient: PublicKey,
+    val details: Details,
+    val parts: List<Part>,
+    val status: Status
+) : WalletPayment() {
     constructor(id: UUID, amount: MilliSatoshi, recipient: PublicKey, details: Details) : this(id, amount, recipient, details, listOf(), Status.Pending)
 
+    @Transient
     val paymentHash: ByteVector32 = details.paymentHash
+
     val fees: MilliSatoshi = when (status) {
         is Status.Failed -> 0.msat
         else -> parts.filter { it.status is Part.Status.Succeeded || it.status == Part.Status.Pending }.map { it.amount }.sum() - recipientAmount
     }
 
+    @Serializable
     sealed class Details {
         abstract val paymentHash: ByteVector32
 
         /** A normal lightning payment. */
+        @Serializable
         data class Normal(val paymentRequest: PaymentRequest) : Details() {
+            @Transient
             override val paymentHash: ByteVector32 = paymentRequest.paymentHash
         }
 
         /** KeySend payments are spontaneous donations that don't need an invoice from the recipient. */
-        data class KeySend(val preimage: ByteVector32) : Details() {
+        @Serializable
+        data class KeySend(@Serializable(with = ByteVector32KSerializer::class) val preimage: ByteVector32) : Details() {
+            @Transient
             override val paymentHash: ByteVector32 = Crypto.sha256(preimage).toByteVector32()
         }
 
         /** Swaps out send a lightning payment to a swap server, which will send an on-chain transaction to a given address. */
-        data class SwapOut(val address: String, override val paymentHash: ByteVector32) : Details()
+        @Serializable
+        data class SwapOut(val address: String, @Serializable(with = ByteVector32KSerializer::class) override val paymentHash: ByteVector32) : Details()
 
         fun matchesFilters(filters: Set<PaymentTypeFilter>): Boolean = when (this) {
             is Normal -> filters.isEmpty() || filters.contains(PaymentTypeFilter.Normal)
@@ -196,10 +232,11 @@ data class OutgoingPayment(val id: UUID, val recipientAmount: MilliSatoshi, val 
         }
     }
 
+    @Serializable
     sealed class Status {
-        object Pending : Status()
-        data class Succeeded(val preimage: ByteVector32, val completedAt: Long = currentTimestampMillis()) : Status()
-        data class Failed(val reason: FinalFailure, val completedAt: Long = currentTimestampMillis()) : Status()
+        @Serializable object Pending : Status()
+        @Serializable data class Succeeded(@Serializable(with = ByteVector32KSerializer::class) val preimage: ByteVector32, val completedAt: Long = currentTimestampMillis()) : Status()
+        @Serializable data class Failed(val reason: FinalFailure, val completedAt: Long = currentTimestampMillis()) : Status()
     }
 
     /**
@@ -211,16 +248,23 @@ data class OutgoingPayment(val id: UUID, val recipientAmount: MilliSatoshi, val 
      * @param status current status of the payment.
      * @param createdAt absolute time in milliseconds since UNIX epoch when the payment was created.
      */
+    @Serializable
     data class Part(val id: UUID, val amount: MilliSatoshi, val route: List<HopDesc>, val status: Status, val createdAt: Long = currentTimestampMillis()) {
+        @Serializable
         sealed class Status {
-            object Pending : Status()
-            data class Succeeded(val preimage: ByteVector32, val completedAt: Long = currentTimestampMillis()) : Status()
-            data class Failed(val failure: Either<ChannelException, FailureMessage>, val completedAt: Long = currentTimestampMillis()) : Status()
+            @Serializable object Pending : Status()
+            @Serializable data class Succeeded(@Serializable(with = ByteVector32KSerializer::class) val preimage: ByteVector32, val completedAt: Long = currentTimestampMillis()) : Status()
+            @Serializable data class Failed(val failure: Either<ChannelException, FailureMessage>, val completedAt: Long = currentTimestampMillis()) : Status()
         }
     }
 }
 
-data class HopDesc(val nodeId: PublicKey, val nextNodeId: PublicKey, val shortChannelId: ShortChannelId? = null) {
+@Serializable
+data class HopDesc(
+    @Serializable(with = PublicKeyKSerializer::class) val nodeId: PublicKey,
+    @Serializable(with = PublicKeyKSerializer::class) val nextNodeId: PublicKey,
+    val shortChannelId: ShortChannelId? = null
+) {
     override fun toString(): String = when (shortChannelId) {
         null -> "$nodeId->$nextNodeId"
         else -> "$nodeId->$shortChannelId->$nextNodeId"

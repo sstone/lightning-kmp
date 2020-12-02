@@ -6,11 +6,14 @@ import fr.acinq.bitcoin.io.ByteArrayOutput
 import fr.acinq.bitcoin.io.Output
 import fr.acinq.eclair.CltvExpiry
 import fr.acinq.eclair.MilliSatoshi
+import fr.acinq.eclair.io.ByteVector32KSerializer
 import fr.acinq.eclair.utils.eclairLogger
 import fr.acinq.eclair.utils.toByteVector32
 import fr.acinq.secp256k1.Hex
+import kotlinx.serialization.Serializable
 
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 sealed class FailureMessage {
     abstract val message: String
     abstract val code: Int
@@ -59,7 +62,7 @@ sealed class FailureMessage {
                 FinalIncorrectHtlcAmount.code -> FinalIncorrectHtlcAmount(MilliSatoshi(LightningSerializer.u64(stream)))
                 ChannelDisabled.code -> ChannelDisabled(LightningSerializer.byte(stream).toByte(), LightningSerializer.byte(stream).toByte(), readChannelUpdate(stream))
                 ExpiryTooFar.code -> ExpiryTooFar
-                InvalidOnionPayload.code -> InvalidOnionPayload(LightningSerializer.bigSize(stream).toULong(), LightningSerializer.u16(stream))
+                InvalidOnionPayload.code -> InvalidOnionPayload(LightningSerializer.bigSize(stream), LightningSerializer.u16(stream))
                 PaymentTimeout.code -> PaymentTimeout
                 else -> {
                     LightningMessage.logger.warning { "cannot decode ${Hex.encode(input)}" }
@@ -139,112 +142,136 @@ interface Perm
 interface Node
 interface Update { val update: ChannelUpdate }
 
+@Serializable
 object InvalidRealm : FailureMessage(), Perm {
     override val code get() = PERM or 1
     override val message get() = "realm was not understood by the processing node"
 }
+@Serializable
 object TemporaryNodeFailure : FailureMessage(), Node {
     override val code get() = NODE or 2
     override val message get() = "general temporary failure of the processing node"
 }
+@Serializable
 object PermanentNodeFailure : FailureMessage(), Perm, Node {
     override val code get() = PERM or NODE or 2
     override val message get() = "general permanent failure of the processing node"
 }
+@Serializable
 object RequiredNodeFeatureMissing : FailureMessage(), Perm, Node {
     override val code get() = PERM or NODE or 3
     override val message get() = "processing node requires features that are missing from this onion"
 }
-data class InvalidOnionVersion(override val onionHash: ByteVector32) : FailureMessage(), BadOnion, Perm {
+@Serializable
+data class InvalidOnionVersion(@Serializable(with = ByteVector32KSerializer::class) override val onionHash: ByteVector32) : FailureMessage(), BadOnion, Perm {
     override val code get() = InvalidOnionVersion.code
     override val message get() = "onion version was not understood by the processing node"
     companion object { const val code = BADONION or PERM or 4 }
 }
-data class InvalidOnionHmac(override val onionHash: ByteVector32) : FailureMessage(), BadOnion, Perm {
+@Serializable
+data class InvalidOnionHmac(@Serializable(with = ByteVector32KSerializer::class) override val onionHash: ByteVector32) : FailureMessage(), BadOnion, Perm {
     override val code get() = InvalidOnionHmac.code
     override val message get() = "onion HMAC was incorrect when it reached the processing node"
     companion object { const val code = BADONION or PERM or 5 }
 }
-data class InvalidOnionKey(override val onionHash: ByteVector32) : FailureMessage(), BadOnion, Perm {
+@Serializable
+data class InvalidOnionKey(@Serializable(with = ByteVector32KSerializer::class) override val onionHash: ByteVector32) : FailureMessage(), BadOnion, Perm {
     override val code get() = InvalidOnionKey.code
     override val message get() = "ephemeral key was unparsable by the processing node"
     companion object { const val code = BADONION or PERM or 6 }
 }
+@Serializable
 data class TemporaryChannelFailure(override val update: ChannelUpdate) : FailureMessage(), Update {
     override val code get() = TemporaryChannelFailure.code
     override val message get() = "channel ${update.shortChannelId} is currently unavailable"
     companion object { const val code = UPDATE or 7 }
 }
+@Serializable
 object PermanentChannelFailure : FailureMessage(), Perm {
     override val code get() = PERM or 8
     override val message get() = "channel is permanently unavailable"
 }
+@Serializable
 object RequiredChannelFeatureMissing : FailureMessage(), Perm {
     override val code get() = PERM or 9
     override val message get() = "channel requires features not present in the onion"
 }
+@Serializable
 object UnknownNextPeer : FailureMessage(), Perm {
     override val code get() = PERM or 10
     override val message get() = "processing node does not know the next peer in the route"
 }
+@Serializable
 data class AmountBelowMinimum(val amount: MilliSatoshi, override val update: ChannelUpdate) : FailureMessage(), Update {
     override val code get() = AmountBelowMinimum.code
     override val message get() = "payment amount was below the minimum required by the channel"
     companion object { const val code = UPDATE or 11 }
 }
+@Serializable
 data class FeeInsufficient(val amount: MilliSatoshi, override val update: ChannelUpdate) : FailureMessage(), Update {
     override val code get() = FeeInsufficient.code
     override val message get() = "payment fee was below the minimum required by the channel"
     companion object { const val code = UPDATE or 12 }
 }
+@Serializable
 object TrampolineFeeInsufficient : FailureMessage(), Node {
     override val code get() = NODE or 51
     override val message get() = "payment fee was below the minimum required by the trampoline node"
 }
+@Serializable
 data class IncorrectCltvExpiry(val expiry: CltvExpiry, override val update: ChannelUpdate) : FailureMessage(), Update {
     override val code get() = IncorrectCltvExpiry.code
     override val message get() = "payment expiry doesn't match the value in the onion"
     companion object { const val code = UPDATE or 13 }
 }
+@Serializable
 data class ExpiryTooSoon(override val update: ChannelUpdate) : FailureMessage(), Update {
     override val code get() = ExpiryTooSoon.code
     override val message get() = "payment expiry is too close to the current block height for safe handling by the relaying node"
     companion object { const val code = UPDATE or 14 }
 }
+@Serializable
 object TrampolineExpiryTooSoon : FailureMessage(), Node {
     override val code get() = NODE or 52
     override val message get() = "payment expiry is too close to the current block height for safe handling by the relaying node"
 }
+@Serializable
 data class IncorrectOrUnknownPaymentDetails(val amount: MilliSatoshi, val height: Long) : FailureMessage(), Perm {
     override val code get() = IncorrectOrUnknownPaymentDetails.code
     override val message get() = "incorrect payment details or unknown payment hash"
     companion object { const val code = PERM or 15 }
 }
+@Serializable
 data class FinalIncorrectCltvExpiry(val expiry: CltvExpiry) : FailureMessage() {
     override val code get() = FinalIncorrectCltvExpiry.code
     override val message get() = "payment expiry doesn't match the value in the onion"
     companion object { const val code = 18 }
 }
+@Serializable
 data class FinalIncorrectHtlcAmount(val amount: MilliSatoshi) : FailureMessage() {
     override val code get() = FinalIncorrectHtlcAmount.code
     override val message get() = "payment amount is incorrect in the final htlc"
     companion object { const val code = 19 }
 }
+@Serializable
 data class ChannelDisabled(val messageFlags: Byte, val channelFlags: Byte, override val update: ChannelUpdate) : FailureMessage(), Update {
     override val code get() = ChannelDisabled.code
     override val message get() = "channel is currently disabled"
     companion object { const val code = UPDATE or 20 }
 }
+@Serializable
 object ExpiryTooFar : FailureMessage() {
     override val code get() = 21
     override val message get() = "payment expiry is too far in the future"
 }
 @OptIn(ExperimentalUnsignedTypes::class)
-data class InvalidOnionPayload(val tag: ULong, val offset: Int) : FailureMessage(), Perm {
+@Serializable
+data class InvalidOnionPayload(val tag: Long, val offset: Int) : FailureMessage(), Perm {
     override val code get() = InvalidOnionPayload.code
     override val message get() = "onion per-hop payload is invalid"
     companion object { const val code = PERM or 22 }
 }
+@Serializable
 object PaymentTimeout : FailureMessage() {
     override val code get() = 23
     override val message get() = "the complete payment amount was not received within a reasonable time"
@@ -254,6 +281,7 @@ object PaymentTimeout : FailureMessage() {
  * By reading the PERM and NODE bits of the failure code we can still extract useful information for payment retry even
  * without knowing how to decode the failure payload (but we can't extract a channel update or onion hash).
  */
+@Serializable
 data class UnknownFailureMessage(override val code: Int) : FailureMessage() {
     override val message get() = "unknown failure message"
 }

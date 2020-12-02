@@ -739,11 +739,12 @@ data class ChannelReestablish(
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
+@Serializable
 data class AnnouncementSignatures(
-    override val channelId: ByteVector32,
+    @Serializable(with = ByteVector32KSerializer::class) override val channelId: ByteVector32,
     val shortChannelId: ShortChannelId,
-    val nodeSignature: ByteVector64,
-    val bitcoinSignature: ByteVector64
+    @Serializable(with = ByteVector64KSerializer::class) val nodeSignature: ByteVector64,
+    @Serializable(with = ByteVector64KSerializer::class) val bitcoinSignature: ByteVector64
 ) : RoutingMessage, HasChannelId, LightningSerializable<AnnouncementSignatures> {
     override fun serializer(): LightningSerializer<AnnouncementSignatures> = AnnouncementSignatures
 

@@ -273,7 +273,7 @@ data class Commitments(
         val htlcValueInFlight = outgoingHtlcs.map { it.amountMsat }.sum()
         if (commitments1.remoteParams.maxHtlcValueInFlightMsat < htlcValueInFlight.toLong()) {
             // TODO: this should be a specific UPDATE error
-            return Either.Left(HtlcValueTooHighInFlight(channelId, maximum = commitments1.remoteParams.maxHtlcValueInFlightMsat.toULong(), actual = htlcValueInFlight))
+            return Either.Left(HtlcValueTooHighInFlight(channelId, maximum = commitments1.remoteParams.maxHtlcValueInFlightMsat, actual = htlcValueInFlight))
         }
 
         if (outgoingHtlcs.size > commitments1.remoteParams.maxAcceptedHtlcs) {
@@ -320,7 +320,7 @@ data class Commitments(
 
         val htlcValueInFlight = incomingHtlcs.map { it.amountMsat }.sum()
         if (commitments1.localParams.maxHtlcValueInFlightMsat < htlcValueInFlight.toLong()) {
-            return Either.Left(HtlcValueTooHighInFlight(channelId, maximum = commitments1.localParams.maxHtlcValueInFlightMsat.toULong(), actual = htlcValueInFlight))
+            return Either.Left(HtlcValueTooHighInFlight(channelId, maximum = commitments1.localParams.maxHtlcValueInFlightMsat, actual = htlcValueInFlight))
         }
 
         if (incomingHtlcs.size > commitments1.localParams.maxAcceptedHtlcs) {
