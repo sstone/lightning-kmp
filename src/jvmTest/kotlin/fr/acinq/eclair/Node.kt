@@ -16,6 +16,7 @@ import fr.acinq.eclair.db.OutgoingPayment
 import fr.acinq.eclair.db.sqlite.SqliteChannelsDb
 import fr.acinq.eclair.io.*
 import fr.acinq.eclair.payment.PaymentRequest
+import fr.acinq.eclair.serialization.ByteVector32KSerializer
 import fr.acinq.eclair.serialization.Serialization
 import fr.acinq.eclair.tests.TestConstants
 import fr.acinq.eclair.utils.*
@@ -123,6 +124,7 @@ object Node {
         val chainHash: ByteVector32 = when (chain) {
             "regtest" -> Block.RegtestGenesisBlock.hash
             "testnet" -> Block.TestnetGenesisBlock.hash
+            "mainnet" -> Block.LivenetGenesisBlock.hash
             else -> error("invalid chain $chain")
         }
         val chaindir = File(datadir, chain)
@@ -205,6 +207,9 @@ object Node {
             }
         }
 
+        @Serializable
+        data class ChannelInfo(@Serializable(with = ByteVector32KSerializer::class) val channelId: ByteVector32, val state: fr.acinq.eclair.serialization.v1.ChannelState)
+
         runBlocking {
             val electrum = ElectrumClient(TcpSocket.Builder(), this).apply { connect(electrumServerAddress) }
             val watcher = ElectrumWatcher(electrum, this)
@@ -220,6 +225,7 @@ object Node {
                 }
                 install(ContentNegotiation) {
                     register(ContentType.Application.Json, SerializationConverter(Json {
+                        allowStructuredMapKeys = true
                         serializersModule = Serialization.eclairSerializersModule
                     }))
                 }
@@ -248,8 +254,12 @@ object Node {
                         val pr = PaymentRequest.read(request.invoice)
                         call.respond(pr)
                     }
+                    post("/swapin") {
+                        peer.send(SendSwapInRequest)
+                        call.respond("pending")
+                    }
                     get("/channels") {
-                        call.respond(peer.channels.values.toList().map { fr.acinq.eclair.serialization.v1.ChannelState.import(it) })
+                        call.respond(peer.channels.map { ChannelInfo(it.key, fr.acinq.eclair.serialization.v1.ChannelState.import(it.value)) })
                     }
                     get("/channels/{channelId}") {
                         val channelId = ByteVector32(call.parameters["channelId"] ?: error("channelId not provided"))
