@@ -172,39 +172,35 @@ sealed class ChannelState {
                 oldState is Closing && newState is Closing -> actions
                 oldState is ChannelStateWithCommitments && newState is Closing -> {
                     val channelBalance = oldState.commitments.localCommit.spec.toLocal
-                    if (channelBalance > 0.msat) {
-                        val defaultScriptPubKey = oldState.commitments.localParams.defaultFinalScriptPubKey
-                        val localShutdown = when (this) {
-                            is Normal -> this.localShutdown
-                            is Negotiating -> this.localShutdown
-                            is ShuttingDown -> this.localShutdown
-                            else -> null
-                        }
-                        if (localShutdown != null && localShutdown.scriptPubKey != defaultScriptPubKey) {
-                            // Non-default output address
-                            val btcAddr = Helpers.Closing.btcAddressFromScriptPubKey(
-                                scriptPubKey = localShutdown.scriptPubKey,
-                                chainHash = staticParams.nodeParams.chainHash
-                            ) ?: "unknown"
-                            actions + ChannelAction.Storage.StoreChannelClosing(
-                                amount = channelBalance,
-                                closingAddress = btcAddr,
-                                isSentToDefaultAddress = false
-                            )
-                        } else {
-                            // Default output address
-                            val btcAddr = Helpers.Closing.btcAddressFromScriptPubKey(
-                                scriptPubKey = defaultScriptPubKey,
-                                chainHash = staticParams.nodeParams.chainHash
-                            ) ?: "unknown"
-                            actions + ChannelAction.Storage.StoreChannelClosing(
-                                amount = channelBalance,
-                                closingAddress = btcAddr,
-                                isSentToDefaultAddress = true
-                            )
-                        }
-                    } else /* channelBalance <= 0.msat */ {
-                        actions
+                    val defaultScriptPubKey = oldState.commitments.localParams.defaultFinalScriptPubKey
+                    val localShutdown = when (this) {
+                        is Normal -> this.localShutdown
+                        is Negotiating -> this.localShutdown
+                        is ShuttingDown -> this.localShutdown
+                        else -> null
+                    }
+                    if (localShutdown != null && localShutdown.scriptPubKey != defaultScriptPubKey) {
+                        // Non-default output address
+                        val btcAddr = Helpers.Closing.btcAddressFromScriptPubKey(
+                            scriptPubKey = localShutdown.scriptPubKey,
+                            chainHash = staticParams.nodeParams.chainHash
+                        ) ?: "unknown"
+                        actions + ChannelAction.Storage.StoreChannelClosing(
+                            amount = channelBalance,
+                            closingAddress = btcAddr,
+                            isSentToDefaultAddress = false
+                        )
+                    } else {
+                        // Default output address
+                        val btcAddr = Helpers.Closing.btcAddressFromScriptPubKey(
+                            scriptPubKey = defaultScriptPubKey,
+                            chainHash = staticParams.nodeParams.chainHash
+                        ) ?: "unknown"
+                        actions + ChannelAction.Storage.StoreChannelClosing(
+                            amount = channelBalance,
+                            closingAddress = btcAddr,
+                            isSentToDefaultAddress = true
+                        )
                     }
                 }
                 else -> actions
