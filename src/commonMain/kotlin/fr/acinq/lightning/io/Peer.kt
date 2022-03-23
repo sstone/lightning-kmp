@@ -14,6 +14,7 @@ import fr.acinq.lightning.crypto.noise.*
 import fr.acinq.lightning.db.Databases
 import fr.acinq.lightning.db.IncomingPayment
 import fr.acinq.lightning.db.OutgoingPayment
+import fr.acinq.lightning.message.Postman
 import fr.acinq.lightning.payment.IncomingPaymentHandler
 import fr.acinq.lightning.payment.OutgoingPaymentFailure
 import fr.acinq.lightning.payment.OutgoingPaymentHandler
@@ -80,6 +81,7 @@ class Peer(
     val walletParams: WalletParams,
     val watcher: ElectrumWatcher,
     val db: Databases,
+    val postman: Postman,
     socketBuilder: TcpSocket.Builder?,
     scope: CoroutineScope,
     private val initTlvStream: TlvStream<InitTlv> = TlvStream.empty()
@@ -667,6 +669,10 @@ class Peer(
                     msg is PhoenixAndroidLegacyInfo -> {
                         logger.info { "n:$remoteNodeId received ${msg::class} hasChannels=${msg.hasChannels}" }
                         listenerEventChannel.send(PhoenixAndroidLegacyInfoEvent(msg))
+                    }
+                    msg is OnionMessage -> {
+                        logger.info { "n:$remoteNodeId received ${msg::class}" }
+                        postman.processOnionMessage(msg)
                     }
                     else -> logger.warning { "n:$remoteNodeId received unhandled message ${Hex.encode(event.data)}" }
                 }
