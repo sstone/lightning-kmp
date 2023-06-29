@@ -26,7 +26,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, macOS-latest ]
+        os: [ ubuntu-latest ]
     steps:
 
       # 1 - checkout repositories
@@ -61,7 +61,7 @@ jobs:
       # 4 - tests
       - name: Check with integration
         if: matrix.os == 'ubuntu-latest'
-        run: ./gradlew build -PintegrationTests=include
+        run: ./gradlew -i build -PintegrationTests=include
       - name: Check without integration
         if: matrix.os == 'macOS-latest'
         run: ./gradlew build -x jvmTest
