@@ -6,6 +6,8 @@ plugins {
     kotlin("multiplatform") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
     id("org.jetbrains.dokka") version "1.8.10"
+    id("com.android.application") version "7.4.1" apply false
+    id("org.jetbrains.kotlin.android") version "1.8.21" apply false
     `maven-publish`
 }
 
@@ -51,7 +53,7 @@ kotlin {
             api(ktor("serialization-kotlinx-json"))
             implementation(kotlin("test-common"))
             implementation(kotlin("test-annotations-common"))
-            implementation("org.kodein.memory:kodein-memory-files:0.8.1")
+            implementation("org.kodein.memory:klio-files:0.12.0")
         }
     }
 
