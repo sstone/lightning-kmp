@@ -1,12 +1,69 @@
 package fr.acinq.lightning.io
 
 import fr.acinq.lightning.tests.utils.LightningTestSuite
+import io.ktor.network.selector.*
+import io.ktor.network.sockets.*
+import io.ktor.network.tls.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.kodein.log.LoggerFactory
 import org.kodein.log.newLogger
+import java.security.cert.X509Certificate
 import java.util.*
+import javax.net.ssl.X509TrustManager
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
+class SocketCrash {
+
+    companion object {
+        val loggerFactory = LoggerFactory.default
+        val logger = loggerFactory.newLogger(this::class)
+
+        val trustManager = object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> {
+                return emptyArray()
+            }
+        }
+
+        /**
+         * Opens a ssl connection, wait a bit, close it and THEN send a buffer
+         * @param exceptionHandler optional exception handler
+         * @param buffer data to send
+         * @return true if this method completed without errors, false if an exception was caught
+         */
+        suspend fun connectAndSend(exceptionHandler: CoroutineExceptionHandler?, buffer: ByteArray): Boolean {
+            val ctx = exceptionHandler?.let { Dispatchers.IO + it } ?: Dispatchers.IO
+            val socket = aSocket(ActorSelectorManager(Dispatchers.IO))
+                .tcp()
+                .connect("www.google.com", 443)
+                .tls(coroutineContext = ctx, trustManager = trustManager, randomAlgorithm = "SHA1PRNG")
+
+            val output = socket.openWriteChannel(autoFlush = true)
+
+            delay(100)
+
+            socket.dispose()
+
+            try {
+                output.writeFully(buffer)
+                output.flush()
+                logger.info { "wrote ${buffer.size} bytes" }
+            } catch (t: Throwable) {
+                logger.error(t) { "try/catch caught error" }
+                return false
+            }
+            return true
+        }
+    }
+}
 
 class JvmTcpSocketTests : LightningTestSuite() {
 
@@ -28,6 +85,24 @@ class JvmTcpSocketTests : LightningTestSuite() {
         testCases.forEach { keyBase64 ->
             val key = JvmTcpSocket.buildPublicKey(Base64.getDecoder().decode(keyBase64), logger)
             assertEquals(keyBase64, String(Base64.getEncoder().encode(key.encoded)))
+        }
+    }
+
+    @Test
+    fun `both exception handler and local try-catch block catch errors`() {
+        runBlocking {
+            var caught = false
+            val result = SocketCrash.connectAndSend(
+                CoroutineExceptionHandler { _, e ->
+                    run {
+                        logger.error(e) { "exception handler caught error" }
+                        caught = true
+                    }
+                },
+                ByteArray(10 * 1024)
+            )
+            assertFalse(result) // try/catch block in connectAndSend() caught an error
+            assertTrue(caught) // so did our coroutine handler
         }
     }
 }
