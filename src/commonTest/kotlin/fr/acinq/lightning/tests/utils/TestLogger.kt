@@ -19,14 +19,16 @@ package fr.acinq.lightning.tests.utils
 import co.touchlab.kermit.*
 import fr.acinq.lightning.logging.LoggerFactory
 
-data object NoopWriter : LogWriter() {
-    override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {}
-
+data object CustomWriter : LogWriter() {
+    override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
+        println(DefaultFormatter.formatMessage(severity, Tag(tag), Message(message)))
+    }
 }
+
 val testLoggerFactory: LoggerFactory by lazy {
     LoggerFactory(
         loggerConfigInit(
-            logWriters = arrayOf(NoopWriter),
+            logWriters = arrayOf(CustomWriter),
             minSeverity = Severity.Info
         )
     )
