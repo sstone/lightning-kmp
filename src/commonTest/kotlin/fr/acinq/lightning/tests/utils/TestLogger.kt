@@ -16,16 +16,19 @@
 
 package fr.acinq.lightning.tests.utils
 
-import co.touchlab.kermit.CommonWriter
-import co.touchlab.kermit.NoTagFormatter
-import co.touchlab.kermit.Severity
-import co.touchlab.kermit.loggerConfigInit
+import co.touchlab.kermit.*
 import fr.acinq.lightning.logging.LoggerFactory
+
+data object CustomWriter : LogWriter() {
+    override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
+        println(DefaultFormatter.formatMessage(severity, Tag(tag), Message(message)))
+    }
+}
 
 val testLoggerFactory: LoggerFactory by lazy {
     LoggerFactory(
         loggerConfigInit(
-            logWriters = arrayOf(CommonWriter(NoTagFormatter)),
+            logWriters = arrayOf(CustomWriter),
             minSeverity = Severity.Info
         )
     )
