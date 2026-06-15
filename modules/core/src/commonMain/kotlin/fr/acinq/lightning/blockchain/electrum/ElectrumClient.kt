@@ -291,6 +291,8 @@ class ElectrumClient(
 
     override suspend fun startScriptHashSubscription(scriptHash: ByteVector32): ScriptHashSubscriptionResponse = rpcCallMustSucceed(ScriptHashSubscription(scriptHash)) as ScriptHashSubscriptionResponse
 
+    override suspend fun startScriptPubkeySubscription(scriptPubkey: ByteVector): ScriptHashSubscriptionResponse? = rpcCall<ScriptHashSubscriptionResponse>(ScriptPubkeySubscription(scriptPubkey)).right
+
     override suspend fun startHeaderSubscription(): HeaderSubscriptionResponse = rpcCallMustSucceed(HeaderSubscription) as HeaderSubscriptionResponse
 
     /** Stop this instance for good, the client cannot be used after it has been closed. */
@@ -302,7 +304,7 @@ class ElectrumClient(
 
     companion object {
         const val ELECTRUM_CLIENT_NAME = "3.3.6"
-        const val ELECTRUM_PROTOCOL_VERSION = "1.4"
+        const val ELECTRUM_PROTOCOL_VERSION = "1.7"
         val version = ServerVersion()
         internal fun computeScriptHash(publicKeyScript: ByteVector): ByteVector32 = Crypto.sha256(publicKeyScript).toByteVector32().reversed()
     }

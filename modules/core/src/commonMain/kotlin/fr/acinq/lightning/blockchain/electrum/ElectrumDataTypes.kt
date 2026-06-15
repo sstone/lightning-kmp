@@ -170,11 +170,18 @@ data class ScriptHashSubscription(val scriptHash: ByteVector32) : ElectrumReques
 // of confirmations)
 data class ScriptHashSubscriptionResponse(val scriptHash: ByteVector32, val status: String?) : ElectrumSubscriptionResponse
 
+data class ScriptPubkeySubscription(val scriptPubkey: ByteVector) : ElectrumRequest(scriptPubkey) {
+    override val method: String = "blockchain.scriptpubkey.subscribe"
+    val scriptHash: ByteVector32 = ElectrumClient.computeScriptHash(scriptPubkey)
+}
+
 data object HeaderSubscription : ElectrumRequest() {
     override val method: String = "blockchain.headers.subscribe"
 }
 
 data class HeaderSubscriptionResponse(val blockHeight: Int, val header: BlockHeader) : ElectrumSubscriptionResponse
+
+data object PingNotification : ElectrumSubscriptionResponse // added in protocol 1.7
 
 /**
  * Other Electrum responses
@@ -216,6 +223,16 @@ object ElectrumResponseDeserializer : DeserializationStrategy<Either<ElectrumSub
                         val scriptHash = params[0].jsonPrimitive.content
                         val status = params[1].jsonPrimitive.contentOrNull
                         Either.Left(ScriptHashSubscriptionResponse(ByteVector32.fromValidHex(scriptHash), status))
+                    }
+
+                    "blockchain.scriptpubkey.subscribe" -> {
+                        val scriptHash = params[0].jsonPrimitive.content
+                        val status = params[1].jsonPrimitive.contentOrNull
+                        Either.Left(ScriptHashSubscriptionResponse(ByteVector32.fromValidHex(scriptHash), status))
+                    }
+
+                    "server.ping" -> {
+                        Either.Left(PingNotification)
                     }
 
                     else -> throw SerializationException("JSON-RPC Method ${method.content} is not supported")
@@ -312,6 +329,15 @@ internal fun parseJsonResponse(request: ElectrumRequest, rpcResponse: JsonRPCRes
                 is JsonPrimitive -> rpcResponse.result.jsonPrimitive.contentOrNull
                 else -> null
             }
+            ScriptHashSubscriptionResponse(request.scriptHash, status)
+        }
+
+        is ScriptPubkeySubscription -> {
+            val status = when (rpcResponse.result) {
+                is JsonPrimitive -> rpcResponse.result.jsonPrimitive.contentOrNull
+                else -> null
+            }
+            // scriptpubkey subscriptions use script hash, clients are supposed to keep a [script hash -> script pubkey] map
             ScriptHashSubscriptionResponse(request.scriptHash, status)
         }
 

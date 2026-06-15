@@ -1,6 +1,7 @@
 package fr.acinq.lightning.blockchain.electrum
 
 import fr.acinq.bitcoin.BlockHeader
+import fr.acinq.bitcoin.ByteVector
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Transaction
 import fr.acinq.bitcoin.TxId
@@ -47,6 +48,8 @@ interface IElectrumClient : IClient {
 
     /** Subscribe to changes to a given script. */
     suspend fun startScriptHashSubscription(scriptHash: ByteVector32): ScriptHashSubscriptionResponse
+
+    suspend fun startScriptPubkeySubscription(scriptPubkey: ByteVector): ScriptHashSubscriptionResponse?
 
     /** Subscribe to headers for new blocks found. */
     suspend fun startHeaderSubscription(): HeaderSubscriptionResponse

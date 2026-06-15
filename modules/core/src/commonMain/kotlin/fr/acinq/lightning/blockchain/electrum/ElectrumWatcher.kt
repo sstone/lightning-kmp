@@ -47,7 +47,7 @@ class ElectrumWatcher(val client: IElectrumClient, val scope: CoroutineScope, lo
     }
 
     private data class State(
-        val height: Int, // current block height. 0 means that we're not connected
+        val connectionStatus: ElectrumConnectionStatus,
         val watches: Set<Watch> = setOf(),
         val scriptHashStatus: Map<ByteVector32, String> = mapOf(),
         val scriptHashSubscriptions: Set<ByteVector32> = setOf(),
@@ -56,10 +56,19 @@ class ElectrumWatcher(val client: IElectrumClient, val scope: CoroutineScope, lo
         val sent: Set<Transaction> = setOf(),
         val idleSince: Long? = null
     ) {
+        val height = when (connectionStatus) {
+            is ElectrumConnectionStatus.Connected -> connectionStatus.height
+            else -> 0
+        }
         val isConnected = height != 0
+
+        fun updateHeight(height: Int): State = when (connectionStatus) {
+            is ElectrumConnectionStatus.Connected -> copy(connectionStatus = connectionStatus.copy(height = height))
+            else -> this
+        }
     }
 
-    private var state = State(0)
+    private var state = State(connectionStatus = ElectrumConnectionStatus.Closed(null))
 
     private var runJob: Job? = null
     private var timerJob: Job? = null
@@ -151,9 +160,17 @@ class ElectrumWatcher(val client: IElectrumClient, val scope: CoroutineScope, lo
             state = state.copy(
                 watches = state.watches + watch, scriptHashSubscriptions = state.scriptHashSubscriptions + scriptHash
             )
-            if (state.isConnected) {
-                val response = client.startScriptHashSubscription(scriptHash)
-                processScripHashSubscriptionResponse(response)
+            when (val cstatus = state.connectionStatus) {
+                is ElectrumConnectionStatus.Connected -> {
+                    val response = when (cstatus.version.protocolVersion) {
+                        "\"1.7\"" -> client.startScriptPubkeySubscription(scriptHash)!!
+                        else -> {
+                            client.startScriptHashSubscription(scriptHash)
+                        }
+                    }
+                    processScripHashSubscriptionResponse(response)
+                }
+                else -> {}
             }
         }
 
@@ -183,7 +200,7 @@ class ElectrumWatcher(val client: IElectrumClient, val scope: CoroutineScope, lo
                             is ElectrumConnectionStatus.Connecting -> {}
 
                             is ElectrumConnectionStatus.Connected -> {
-                                state = state.copy(height = cmd.status.height)
+                                state = state.copy(connectionStatus = cmd.status)
                                 // reset all subscriptions
                                 state = state.copy(scriptHashSubscriptions = setOf(), scriptHashStatus = mapOf())
                                 state.watches.forEach { addWatch(it) }
@@ -195,7 +212,7 @@ class ElectrumWatcher(val client: IElectrumClient, val scope: CoroutineScope, lo
                             }
 
                             is ElectrumConnectionStatus.Closed -> {
-                                state = state.copy(height = 0, scriptHashSubscriptions = setOf(), scriptHashStatus = mapOf(), idleSince = null)
+                                state = state.copy(connectionStatus = cmd.status, scriptHashSubscriptions = setOf(), scriptHashStatus = mapOf(), idleSince = null)
                                 stopTimer()
                             }
                         }
@@ -209,7 +226,7 @@ class ElectrumWatcher(val client: IElectrumClient, val scope: CoroutineScope, lo
 
                             is HeaderSubscriptionResponse -> {
                                 logger.info { "got new tip ${cmd.notification}" }
-                                state = state.copy(height = cmd.notification.blockHeight)
+                                state = state.updateHeight(cmd.notification.blockHeight)
 
                                 state.watches.filterIsInstance<WatchConfirmed>().forEach { watch ->
                                     val scriptHash = ElectrumClient.computeScriptHash(watch.publicKeyScript)

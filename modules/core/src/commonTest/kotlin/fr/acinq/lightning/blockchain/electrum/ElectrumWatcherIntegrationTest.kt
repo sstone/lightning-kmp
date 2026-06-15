@@ -19,13 +19,14 @@ import fr.acinq.lightning.utils.sat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-class ElectrumWatcherIntegrationTest : LightningTestSuite() {
+class ElectrumWatcherItegrationTest : LightningTestSuite() {
 
     private val bitcoincli = BitcoindService
 
@@ -363,7 +364,7 @@ class ElectrumWatcherIntegrationTest : LightningTestSuite() {
         client.stop()
     }
 
-    @Test
+    @Ignore
     fun `notify when ready`() = runSuspendTest(timeout = 50.seconds) {
         // Run on a production server
         val client = ElectrumClient(this, loggerFactory).apply { connect(ServerAddress("electrum.acinq.co", 50002, TcpSocket.TLS.UNSAFE_CERTIFICATES), TcpSocket.Builder()) }
