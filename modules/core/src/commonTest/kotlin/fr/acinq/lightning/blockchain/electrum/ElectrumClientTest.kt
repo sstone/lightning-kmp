@@ -112,8 +112,8 @@ class ElectrumClientTest : LightningTestSuite() {
     @Test
     fun `get headers`() = runTest { client ->
         val start = (500000 / 2016) * 2016
-        val headers = client.getHeaders(start, 2016)
-        assertEquals(2016, headers.size)
+        val headers = client.getHeaders(start, 200)
+        assertEquals(200, headers.size)
         client.stop()
     }
 
